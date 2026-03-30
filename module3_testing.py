@@ -1,15 +1,12 @@
-def F3_testing(model, X_test):
+# module3_testing.py
+
+def test_model(model, scaler, X_test, y_test):
     """
-    Module 3: Testing
-
-    Input:
-        model : trained ML model
-        X_test : feature matrix for test data
-
-    Output:
-        y_pred : predicted y values
+    Applies model on test data (no leakage)
     """
 
-    y_pred = model.predict(X_test)
+    X_scaled = scaler.transform(X_test)
 
-    return y_pred
+    predictions = model.predict(X_scaled)
+
+    return predictions, y_test
