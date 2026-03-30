@@ -1,0 +1,50 @@
+# run_pipeline.py
+
+import sys
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from module1_dataprep import prepare_data
+from module2_training import train_model
+from module3_testing import test_model
+from module4_evaluation import evaluate_model
+
+file_path = sys.argv[1]
+lookback = int(sys.argv[2])
+train_start = sys.argv[3]
+train_end = sys.argv[4]
+test_start = sys.argv[5]
+test_end = sys.argv[6]
+
+print("Running pipeline with parameters:")
+print("Lookback:", lookback)
+print("Train:", train_start, "to", train_end)
+print("Test:", test_start, "to", test_end)
+
+# Load data
+df = pd.read_csv(file_path)
+df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+
+# Split by dates
+train_df = df[(df["Timestamp"] >= train_start) & (df["Timestamp"] <= train_end)]
+test_df = df[(df["Timestamp"] >= test_start) & (df["Timestamp"] <= test_end)]
+
+# Prepare data
+X_train, y_train = prepare_data(train_df, lookback=lookback)
+X_test, y_test = prepare_data(test_df, lookback=lookback)
+
+# Train
+model, scaler = train_model(X_train, y_train)
+
+# Test
+predictions, y_test = test_model(model, scaler, X_test, y_test)
+
+# Evaluate
+results = evaluate_model(y_test, predictions)
+
+print("Results:")
+print(results)
+
+plt.plot(results["capital_history"])
+plt.title("Money Under Management")
+plt.show()
