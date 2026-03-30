@@ -1,19 +1,37 @@
+# module4_evaluation.py
+
 import numpy as np
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
-def F4_summary(y_pred, y_true):
+def evaluate_model(y_true, y_pred):
     """
-    Module 4: Summary
-
-    Input:
-        y_pred : predicted values
-        y_true : actual values
-
-    Output:
-        accuracy_percentage
+    Computes metrics + trading strategy
     """
 
-    same_sign = np.sign(y_pred) == np.sign(y_true)
+    mse = mean_squared_error(y_true, y_pred)
+    mae = mean_absolute_error(y_true, y_pred)
 
-    accuracy = np.mean(same_sign) * 100
+    # Directional accuracy
+    direction_true = np.sign(y_true)
+    direction_pred = np.sign(y_pred)
+    accuracy = np.mean(direction_true == direction_pred)
 
-    return accuracy
+    # Trading strategy
+    capital = 10000
+    capital_history = [capital]
+
+    for i in range(len(y_pred)):
+        if y_pred[i] > 0:
+            capital += y_true[i]
+        else:
+            capital -= y_true[i]
+
+        capital_history.append(capital)
+
+    return {
+        "mse": mse,
+        "mae": mae,
+        "directional_accuracy": accuracy,
+        "final_capital": capital,
+        "capital_history": capital_history
+    }
