@@ -1,54 +1,41 @@
+# module1_dataprep.py
+
 import pandas as pd
 import numpy as np
 
-def F1_dataprep(csv_file):
+def prepare_data(file_path, lookback=4, target_type="difference"):
     """
-    Module 1: Data Preparation
-    
-    Input:
-        csv_file : path to dataset CSV
-        
-    Output:
-        X : feature matrix (36 features per sample)
-        y : target vector (close - open for next minute)
+    Converts time series into supervised learning format using rolling window.
     """
 
-    # Load dataset
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(file_path)
 
-    # Features expected in dataset
-    features = [
-        "Open",
-        "Low",
-        "High",
-        "Close",
-        "VWAP",
-        "Volume",
-        "UpTicks",
-        "DownTicks",
-        "SameTicks"
-    ]
+    # Combine timestamp if separate
+    if "Date" in df.columns and "Time" in df.columns:
+        df["Timestamp"] = pd.to_datetime(df["Date"] + " " + df["Time"])
 
-    # Check features exist
-    df = df[features]
+    df = df.sort_values("Timestamp").reset_index(drop=True)
+
+    features = ["Open", "High", "Low", "Close"]
 
     X = []
     y = []
 
-    # Build training samples
-    for i in range(4, len(df) - 1):
+    for i in range(lookback, len(df) - 1):
+        window = df.iloc[i - lookback:i]
 
-        # Previous 4 minutes features
-        window = df.iloc[i-4:i].values.flatten()
+        # Flatten features
+        x_row = window[features].values.flatten()
 
-        # Target = next minute price change
-        next_row = df.iloc[i]
-        target = next_row["Close"] - next_row["Open"]
+        # Target calculation
+        if target_type == "difference":
+            target = df.iloc[i]["Close"] - df.iloc[i]["Open"]
+        elif target_type == "return":
+            target = (df.iloc[i]["Close"] - df.iloc[i]["Open"]) / df.iloc[i]["Open"]
+        else:
+            raise ValueError("Invalid target type")
 
-        X.append(window)
+        X.append(x_row)
         y.append(target)
 
-    X = np.array(X)
-    y = np.array(y)
-
-    return X, y
+    return np.array(X), np.array(y)
