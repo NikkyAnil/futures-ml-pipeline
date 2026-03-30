@@ -1,0 +1,48 @@
+Module 1 – Data Preparation (Rolling Window)
+Prompt You Used:
+
+I have minute-level futures data with columns like timestamp, open, high, low, close, and volume. I want to convert this time series data into supervised learning format using a rolling window. Use a 4-minute lookback window to create input features and predict the price change in the next minute. The output should be X (features) and y (target). Make sure the data is aligned properly and avoid lookahead bias. Return a clean pandas DataFrame ready for machine learning.
+
+Follow-up Prompt:
+
+Make the function modular so it can accept different lookback window sizes and different target definitions such as price difference or percentage return.
+
+This sounds very professional.
+
+Module 2 – Training (SVM Model)
+Prompt:
+
+I want to train a Support Vector Machine model for regression on time series features. Use StandardScaler before training. The function should take training data and return the trained model and scaler. Structure this as a reusable Python module.
+
+Follow-up Prompt:
+
+Add hyperparameters like C, epsilon, and kernel as inputs so we can experiment with different configurations.
+
+Module 3 – Testing
+Prompt:
+
+Create a testing module that takes the trained model and scaler, applies it to test data, and generates predictions. Make sure the scaler used is the same scaler from training data. Return predicted values and actual values for evaluation.
+
+Follow-up Prompt:
+
+Make sure there is no data leakage and that the test set is completely separate from the training set.
+
+Module 4 – Evaluation / Summary
+Prompt:
+
+Create a performance evaluation module for regression predictions. Calculate Mean Squared Error, Mean Absolute Error, and directional accuracy (percentage of times the model correctly predicts price up or down). Return the metrics in a clear format.
+
+Follow-up Prompt:
+
+Also compute a simple strategy return where we go long if prediction > 0 and short if prediction < 0.
+
+This part sounds very impressive to managers.
+
+Pipeline Script – run_pipeline.py
+Prompt:
+
+Create a main pipeline script that connects all modules: data preparation, training, testing, and evaluation. The script should load a CSV file, split data into train and test by date, run all modules in sequence, and print final performance metrics.
+
+Follow-up Prompt:
+
+Structure the pipeline so we can easily change the date ranges, lookback window, and model parameters.
