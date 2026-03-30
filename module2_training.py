@@ -1,19 +1,17 @@
+# module2_training.py
+
 from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler
 
-def F2_training(X_train, y_train):
+def train_model(X_train, y_train, C=1.0, epsilon=0.1, kernel='rbf'):
     """
-    Module 2: Training
-
-    Input:
-        X_train : feature matrix
-        y_train : target vector
-
-    Output:
-        trained_model : trained SVM model
+    Trains SVM model with scaling
     """
 
-    model = SVR(kernel="linear")
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_train)
 
-    model.fit(X_train, y_train)
+    model = SVR(C=C, epsilon=epsilon, kernel=kernel)
+    model.fit(X_scaled, y_train)
 
-    return model
+    return model, scaler
