@@ -1,0 +1,103 @@
+"""
+MODULE 1 — DATA PREPARATION
+============================
+Prompt used:
+  "I have minute-level futures data. Convert it into supervised learning format
+   using a rolling lookback window. For each window, produce both absolute OHLCV
+   features AND relative percentage-change features (everything relative to the
+   opening price of the first minute in the window). The target y should be the
+   percentage change of the 5th minute: (close - open) / open * 100.
+   Allow a flag to disable the relative features so we can test with absolute only."
+
+Input : CSV file path, lookback (int), use_relative_features (bool), max_rows (int)
+Output: X (ndarray), y (ndarray), feature_names (list), timestamps (list)
+"""
+
+import pandas as pd
+import numpy as np
+
+RAW_FEATURES = ["Open", "High", "Low", "Close", "VWAP",
+                 "Volume", "Up Ticks", "Down Ticks", "Same Ticks"]
+
+
+def load_data(csv_path: str, max_rows: int = None) -> pd.DataFrame:
+    df = pd.read_csv(csv_path)
+    df["Timestamp"] = pd.to_datetime(df["Date and Time"], dayfirst=False)
+    df = df.sort_values("Timestamp").reset_index(drop=True)
+    for col in RAW_FEATURES:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=RAW_FEATURES).reset_index(drop=True)
+    if max_rows:
+        df = df.head(max_rows)
+    return df
+
+
+def build_feature_matrix(df: pd.DataFrame,
+                          lookback: int = 4,
+                          use_relative: bool = True):
+    abs_names = [f"{col}_t-{lookback - j}" for j in range(lookback)
+                 for col in RAW_FEATURES]
+    rel_names = [f"{col}_rel_t-{lookback - j}" for j in range(lookback)
+                 for col in RAW_FEATURES]
+
+    X_abs_rows, X_rel_rows, y_vals, timestamps = [], [], [], []
+
+    for i in range(lookback, len(df) - 1):
+        window = df.iloc[i - lookback: i]
+        ref_open = window.iloc[0]["Open"]
+
+        abs_vec = window[RAW_FEATURES].values.flatten().tolist()
+
+        if ref_open != 0:
+            rel_vec = [(v - ref_open) / ref_open * 100 for v in abs_vec]
+        else:
+            rel_vec = [0.0] * len(abs_vec)
+
+        target_open  = df.iloc[i]["Open"]
+        target_close = df.iloc[i]["Close"]
+        y = (target_close - target_open) / target_open * 100 if target_open != 0 else 0.0
+
+        X_abs_rows.append(abs_vec)
+        X_rel_rows.append(rel_vec)
+        y_vals.append(y)
+        timestamps.append(df.iloc[i]["Timestamp"])
+
+    X_abs = np.array(X_abs_rows, dtype=np.float64)
+    X_rel = np.array(X_rel_rows, dtype=np.float64)
+    y     = np.array(y_vals,     dtype=np.float64)
+
+    if use_relative:
+        X = np.hstack([X_abs, X_rel])
+        feature_names = abs_names + rel_names
+    else:
+        X = X_abs
+        feature_names = abs_names
+
+    mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
+    return X[mask], y[mask], feature_names, [timestamps[k] for k in range(len(mask)) if mask[k]]
+
+
+def time_split(X, y, timestamps, t2_str: str):
+    """
+    Split at T2. Falls back to 70/30 if T2 is outside the loaded data range.
+    """
+    fallback = False
+    train_idx, test_idx = [], []
+
+    if t2_str:
+        t2 = pd.Timestamp(t2_str)
+        train_idx = [i for i, t in enumerate(timestamps) if t < t2]
+        test_idx  = [i for i, t in enumerate(timestamps) if t >= t2]
+        if len(train_idx) == 0 or len(test_idx) == 0:
+            fallback = True
+
+    if not t2_str or fallback:
+        split = int(0.7 * len(X))
+        train_idx = list(range(split))
+        test_idx  = list(range(split, len(X)))
+        if fallback:
+            print(f"  [!] T2={t2_str} outside loaded data range — using 70/30 index split")
+
+    X_train = X[train_idx];  y_train = y[train_idx]
+    X_test  = X[test_idx];   y_test  = y[test_idx]
+    return X_train, y_train, X_test, y_test, train_idx, test_idx
