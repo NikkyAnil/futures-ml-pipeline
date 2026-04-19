@@ -1,0 +1,40 @@
+"""
+MODULE 2 — MODEL TRAINING
+==========================
+Prompt used:
+  "Train a binary classification model on time-series features.
+   The label is sign(y): +1 if price went up, -1 if down.
+   Support two model types: SVM (SVC) and Gradient Boosting Classifier.
+   Use StandardScaler. Return the trained model and scaler."
+
+Input : X_train (ndarray), y_train (ndarray), model_type ('svm' | 'gradient_boost')
+Output: trained model, fitted scaler
+"""
+
+import numpy as np
+from sklearn.svm import SVC
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.preprocessing import StandardScaler
+
+
+def train_model(X_train: np.ndarray,
+                y_train: np.ndarray,
+                model_type: str = "svm"):
+    labels = np.where(y_train > 0, 1, -1)
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_train)
+
+    if model_type == "svm":
+        model = SVC(kernel="rbf", C=1.0, gamma="scale",
+                    probability=True, random_state=42)
+    elif model_type == "gradient_boost":
+        model = GradientBoostingClassifier(
+            n_estimators=100, max_depth=3,
+            learning_rate=0.1, random_state=42
+        )
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+
+    model.fit(X_scaled, labels)
+    return model, scaler
