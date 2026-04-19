@@ -1,0 +1,121 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+
+from module1_dataprep.dataprep     import load_data, build_feature_matrix, time_split
+from module2_training.training     import train_model
+from module3_testing.testing       import run_testing
+from module4_statistics.statistics import compute_metrics
+
+CSV = "/home/claude/TY_data/TY.csv"
+
+EXPERIMENTS = [
+    dict(label="SVM | abs+rel",        model="svm",            max_rows=5000, use_relative=True,  train_as_test=False),
+    dict(label="GradBoost | abs+rel",  model="gradient_boost", max_rows=5000, use_relative=True,  train_as_test=False),
+    dict(label="SVM | abs only",       model="svm",            max_rows=5000, use_relative=False,  train_as_test=False),
+    dict(label="GradBoost | abs only", model="gradient_boost", max_rows=5000, use_relative=False,  train_as_test=False),
+    dict(label="SVM | train=test",     model="svm",            max_rows=5000, use_relative=True,  train_as_test=True),
+    dict(label="SVM | toy (100 rows)", model="svm",            max_rows=100,  use_relative=True,  train_as_test=False),
+]
+
+results_list = []
+for exp in EXPERIMENTS:
+    print(f"Running: {exp['label']} ...")
+    df = load_data(CSV, max_rows=exp["max_rows"])
+    X, y, _, timestamps = build_feature_matrix(df, lookback=4, use_relative=exp["use_relative"])
+    X_train, y_train, X_test, y_test, _, _ = time_split(X, y, timestamps, "2023-10-01")
+    if exp["train_as_test"]:
+        X_test, y_test = X_train.copy(), y_train.copy()
+    if len(X_test) < 5:
+        print("  skip"); continue
+    model, scaler = train_model(X_train, y_train, model_type=exp["model"])
+    y_true, y_pred, y_proba = run_testing(model, scaler, X_test, y_test)
+    metrics, aum, fpr, tpr, roc_auc = compute_metrics(
+        y_true, y_pred, y_proba, y_continuous=y_test, threshold=0.55)
+    results_list.append({"label": exp["label"], "metrics": metrics,
+                          "aum": aum, "fpr": fpr, "tpr": tpr, "roc_auc": roc_auc})
+    print(f"  acc={metrics['overall_accuracy']}%  +prec={metrics['precision_positive']}%"
+          f"  -prec={metrics['precision_negative']}%  AUC={metrics['roc_auc']}  PnL=${metrics['pnl']}")
+
+# ── FIGURE ────────────────────────────────────────────────────────────────────
+n   = len(results_list)
+fig = plt.figure(figsize=(16, 4 * n + 4), facecolor="white")
+fig.suptitle("Futures ML Pipeline — Experiment Results", fontsize=14,
+             fontweight="bold", color="black")
+
+# Summary table
+ax0 = fig.add_subplot(n + 1, 1, 1)
+ax0.axis("off")
+headers = ["Experiment", "Overall%", "+Prec%", "-Prec%", "AUC", "Final $", "P&L"]
+rows = [[r["label"],
+         f"{r['metrics']['overall_accuracy']}%",
+         f"{r['metrics']['precision_positive']}%",
+         f"{r['metrics']['precision_negative']}%",
+         f"{r['metrics']['roc_auc']}",
+         f"${r['metrics']['final_capital']:,.0f}",
+         f"${r['metrics']['pnl']:+,.0f}"] for r in results_list]
+tbl = ax0.table(cellText=rows, colLabels=headers, loc="center", cellLoc="center")
+tbl.auto_set_font_size(False); tbl.set_fontsize(9); tbl.scale(1, 1.8)
+for (r, c), cell in tbl.get_celld().items():
+    cell.set_edgecolor("#cccccc")
+    if r == 0:
+        cell.set_facecolor("#111"); cell.set_text_props(color="white", fontweight="bold")
+    elif r % 2 == 0:
+        cell.set_facecolor("#f8f8f8")
+    if r > 0 and c == 6:
+        cell.set_facecolor("#d4edda" if results_list[r-1]["metrics"]["pnl"] >= 0 else "#f8d7da")
+ax0.set_title("Summary", fontsize=11, color="black")
+
+# Per-experiment: AUM | ROC | bars
+for i, r in enumerate(results_list):
+    m = r["metrics"]
+
+    # AUM
+    ax1 = fig.add_subplot(n + 1, 3, (i + 1) * 3 + 1)
+    ax1.plot(r["aum"], color="black", linewidth=1.2)
+    ax1.axhline(r["aum"][0], color="#888", linestyle="--", linewidth=0.7)
+    ax1.fill_between(range(len(r["aum"])), r["aum"][0], r["aum"],
+                     where=[v >= r["aum"][0] for v in r["aum"]],
+                     alpha=0.15, color="black")
+    ax1.set_title(f"AUM — {r['label']}", fontsize=8, color="black")
+    ax1.set_xlabel("Time step", fontsize=7); ax1.set_ylabel("Capital ($)", fontsize=7)
+    ax1.tick_params(labelsize=7)
+    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"${x:,.0f}"))
+    for sp in ax1.spines.values(): sp.set_color("#333")
+
+    # ROC
+    ax2 = fig.add_subplot(n + 1, 3, (i + 1) * 3 + 2)
+    ax2.plot(r["fpr"], r["tpr"], color="black", linewidth=2, label=f"AUC = {r['roc_auc']:.3f}")
+    ax2.plot([0, 1], [0, 1], "--", color="#888", linewidth=0.8, label="Random")
+    ax2.fill_between(r["fpr"], r["tpr"], alpha=0.08, color="black")
+    ax2.set_title("ROC Curve", fontsize=8, color="black")
+    ax2.set_xlabel("False Positive Rate", fontsize=7); ax2.set_ylabel("True Positive Rate", fontsize=7)
+    ax2.tick_params(labelsize=7); ax2.legend(fontsize=7, frameon=False)
+    for sp in ax2.spines.values(): sp.set_color("#333")
+
+    # Accuracy bars
+    ax3 = fig.add_subplot(n + 1, 3, (i + 1) * 3 + 3)
+    labels = ["Overall", "+ Prec\n(longs)", "- Prec\n(shorts)", f"Conf\n≥{m['threshold_used']}"]
+    vals   = [m["overall_accuracy"], m["precision_positive"],
+              m["precision_negative"], m["accuracy_threshold"]]
+    shades = ["#111", "#333", "#555", "#777"]
+    bars   = ax3.bar(labels, vals, color=shades, edgecolor="black", linewidth=0.6, width=0.55)
+    ax3.axhline(50, color="red", linestyle="--", linewidth=1.0, label="50% random")
+    ax3.set_ylim(0, 115); ax3.set_ylabel("Accuracy %", fontsize=7)
+    ax3.set_title("Accuracy Breakdown", fontsize=8, color="black")
+    ax3.tick_params(labelsize=7); ax3.legend(fontsize=6, frameon=False)
+    for bar, val in zip(bars, vals):
+        ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 1,
+                 f"{val:.1f}%", ha="center", va="bottom", fontsize=7, color="black")
+    for sp in ax3.spines.values(): sp.set_color("#333")
+
+plt.tight_layout(rect=[0, 0, 1, 0.97])
+out = "/home/claude/pipeline/all_experiments.png"
+plt.savefig(out, dpi=130, bbox_inches="tight", facecolor="white")
+plt.close()
+print(f"\nFigure saved → {out}")
