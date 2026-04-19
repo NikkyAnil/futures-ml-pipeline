@@ -1,0 +1,113 @@
+"""
+RUN PIPELINE — fully automated, zero human intervention
+=========================================================
+Usage:
+  python run_pipeline.py [options]
+
+Options:
+  --csv           path to CSV file
+  --t2            train/test split date (YYYY-MM-DD)
+  --lookback      rolling window in minutes (default 4)
+  --max_rows      cap dataset size (default 10000)
+  --model         svm | gradient_boost (default svm)
+  --threshold     confidence threshold (default 0.55)
+  --use_relative  1=abs+relative features, 0=absolute only (default 1)
+  --train_as_test 1=use training set as test set (default 0)
+  --out_dir       output directory for figure + metrics JSON
+"""
+
+import sys, os, argparse, json
+sys.path.insert(0, os.path.dirname(__file__))
+
+from module1_dataprep.dataprep     import load_data, build_feature_matrix, time_split
+from module2_training.training     import train_model
+from module3_testing.testing       import run_testing
+from module4_statistics.statistics import compute_metrics, plot_results
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--csv",           default="/home/claude/TY_data/TY.csv")
+    p.add_argument("--t2",            default="2023-10-01")
+    p.add_argument("--lookback",      type=int,   default=4)
+    p.add_argument("--max_rows",      type=int,   default=5000)
+    p.add_argument("--model",         default="svm",
+                   choices=["svm", "gradient_boost"])
+    p.add_argument("--threshold",     type=float, default=0.55)
+    p.add_argument("--use_relative",  type=int,   default=1)
+    p.add_argument("--train_as_test", type=int,   default=0)
+    p.add_argument("--out_dir",       default="/home/claude/pipeline")
+    return p.parse_args()
+
+
+def run(args):
+    print("\n" + "="*60)
+    print("  FUTURES ML PIPELINE")
+    print("="*60)
+
+    # ── MODULE 1: DATA PREP ──────────────────────────────────────
+    print("\n[MODULE 1] Data preparation...")
+    df = load_data(args.csv, max_rows=args.max_rows)
+    print(f"  Loaded {len(df):,} rows  "
+          f"({df['Timestamp'].iloc[0].date()} → {df['Timestamp'].iloc[-1].date()})")
+
+    use_rel = bool(args.use_relative)
+    X, y, feature_names, timestamps = build_feature_matrix(
+        df, lookback=args.lookback, use_relative=use_rel)
+    print(f"  Feature matrix: {X.shape}  "
+          f"({'absolute + relative' if use_rel else 'absolute only'})")
+    print(f"  Target y: % price change  |  "
+          f"up: {(y>0).sum()}  down: {(y<=0).sum()}")
+
+    X_train, y_train, X_test, y_test, _, _ = time_split(
+        X, y, timestamps, args.t2)
+
+    if args.train_as_test:
+        print("  [!] train_as_test=1 → using TRAINING set as test set")
+        X_test, y_test = X_train.copy(), y_train.copy()
+
+    print(f"  Train: {len(X_train):,}  |  Test: {len(X_test):,}")
+
+    # ── MODULE 2: TRAINING ───────────────────────────────────────
+    print(f"\n[MODULE 2] Training {args.model.upper()}...")
+    model, scaler = train_model(X_train, y_train, model_type=args.model)
+    print(f"  Model trained: {type(model).__name__}")
+
+    # ── MODULE 3: TESTING ────────────────────────────────────────
+    print("\n[MODULE 3] Generating predictions...")
+    y_true, y_pred, y_proba = run_testing(model, scaler, X_test, y_test)
+    print(f"  Predictions: {len(y_pred):,} samples")
+
+    # ── MODULE 4: STATISTICS ─────────────────────────────────────
+    print("\n[MODULE 4] Computing statistics...")
+    metrics, aum, fpr, tpr, roc_auc = compute_metrics(
+        y_true, y_pred, y_proba,
+        y_continuous=y_test,
+        threshold=args.threshold)
+
+    suffix = (f"{args.model.upper()} | "
+              f"{'rel+abs' if use_rel else 'abs only'} | "
+              f"rows={args.max_rows}")
+    fig_path = os.path.join(args.out_dir, "results.png")
+    plot_results(metrics, aum, fpr, tpr, roc_auc,
+                 out_path=fig_path, title_suffix=suffix)
+
+    # Save metrics JSON for GUI to read
+    metrics_path = os.path.join(args.out_dir, "last_metrics.json")
+    with open(metrics_path, "w") as f:
+        json.dump(metrics, f)
+
+    print("\n" + "─"*60)
+    print("  RESULTS")
+    print("─"*60)
+    for k, v in metrics.items():
+        if k not in ("capital_history",):
+            print(f"  {k:<28} {v}")
+    print("─"*60)
+
+    return metrics
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    run(args)
