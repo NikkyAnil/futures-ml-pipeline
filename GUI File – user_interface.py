@@ -1,6 +1,8 @@
+// @charset "UTF-8"
+// @flow
 import { useState, useRef, useEffect, useCallback } from "react";
 
-// ─── Canvas Charts ────────────────────────────────────────────────────────────
+// --- Canvas Charts ------------------------------------------------------------
 function useCanvas(draw, deps) {
   const ref = useRef(null);
   useEffect(() => {
@@ -211,7 +213,7 @@ function StabilityChart({ points }) {
   return <canvas ref={ref} style={{ width: "100%", height: "100%", display: "block" }} />;
 }
 
-// ─── UI Atoms ─────────────────────────────────────────────────────────────────
+// --- UI Atoms -----------------------------------------------------------------
 const css = {
   card: {
     background: "rgba(255,255,255,0.03)",
@@ -278,7 +280,7 @@ function MetricCard({ label, value, sub, trend }) {
   return (
     <div style={{ ...css.card, display: "flex", flexDirection: "column", gap: 4 }}>
       <div style={css.label}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.5px" }}>{value ?? "—"}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.5px" }}>{value ?? "--"}</div>
       {sub && <div style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", marginTop: 1 }}>{sub}</div>}
     </div>
   );
@@ -297,7 +299,7 @@ function StepDot({ n, label, sub, status }) {
         boxShadow: status === "active" ? "0 0 12px rgba(99,179,237,0.5)" : "none",
         transition: "all .3s",
       }}>
-        {status === "done" ? "✓" : n}
+        {status === "done" ? "OK" : n}
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: labelCol, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
@@ -319,7 +321,7 @@ function ChartCard({ title, badge, children, height = 160 }) {
   );
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
+// --- Main App -----------------------------------------------------------------
 export default function App() {
   const [tab, setTab] = useState("run"); // run | benchmark | stability
   const [cfg, setCfg] = useState({
@@ -369,7 +371,7 @@ export default function App() {
     return full;
   }, []);
 
-  // ── RUN PIPELINE ────────────────────────────────────────────────────────────
+  // -- RUN PIPELINE ------------------------------------------------------------
   const runPipeline = useCallback(async () => {
     setRunning(true); setLogs([]); setResults(null); setStep(0);
     const trs = Math.round((cfg.maxRows - cfg.lookback) * cfg.splitPct / 100);
@@ -405,7 +407,7 @@ ${cfg.trainAsTest
   : cfg.featureMode === "engineered"
   ? "engineered: overall=54-60, precision_positive=35-45, recall_positive=35-45, precision_negative=62-68, accuracy_threshold=52-62, roc_auc=0.50-0.56, pnl=-150 to 150"
   : "overall=55-62, precision_positive=28-45, recall_positive=20-40, precision_negative=60-68, accuracy_threshold=50-62, roc_auc=0.48-0.56, pnl=-100 to 100"}
-aum: 80 values realistic random walk starting exactly at 10000, final ≈ 10000+pnl
+aum: 80 values realistic random walk starting exactly at 10000, final ~ 10000+pnl
 Output ONLY the log lines and RESULTS_JSON. Nothing else.`;
 
     const seen = new Set();
@@ -423,13 +425,13 @@ Output ONLY the log lines and RESULTS_JSON. Nothing else.`;
           addLog(t, type);
         });
         const m = full.match(/RESULTS_JSON:(\{[\s\S]*?\})/);
-        if (m) { try { setResults(JSON.parse(m[1])); setStep(5); addLog("Pipeline complete ✓", "ok"); } catch {} }
+        if (m) { try { setResults(JSON.parse(m[1])); setStep(5); addLog("Pipeline complete OK", "ok"); } catch {} }
       });
     } catch (e) { addLog("Error: " + e.message, "err"); }
     setRunning(false);
   }, [cfg, callAPI]);
 
-  // ── BENCHMARK ───────────────────────────────────────────────────────────────
+  // -- BENCHMARK ---------------------------------------------------------------
   const runBenchmark = useCallback(async () => {
     setRunning(true); setBenchRows([]); setLogs([]);
     addLog("Running benchmark across all feature modes and models...", "module");
@@ -439,14 +441,14 @@ Return ONLY a JSON array. Each element:
 {"label":"...","overall":float,"pp":float,"np":float,"recall":float,"auc":float,"pnl":float}
 
 Generate exactly these 8 experiments with realistic values for TY futures data (36% up / 64% down):
-1. label="raw | SVM" — baseline, no balancing → overall≈57, pp≈20-35, np≈63, auc≈0.50-0.53
-2. label="relative | SVM" — relative features → overall≈54-57, pp≈30-42, np≈62, auc≈0.51-0.54
-3. label="both | SVM" — raw+relative → overall≈58-62, pp≈38-44, np≈64, auc≈0.52-0.55
-4. label="engineered | SVM" — signal features → overall≈55-60, pp≈36-45, np≈63, auc≈0.51-0.56
-5. label="engineered | GradBoost" → overall≈55-60, pp≈38-48, np≈63, auc≈0.52-0.56
-6. label="Henry/Sevan benchmark" — linear SVM no balance → overall≈63-64, pp≈0-5, np≈63-64, auc≈0.44-0.50
-7. label="engineered | Train=Test" — overfit check → overall≈75-82, pp≈65-78, np≈84-90, auc≈0.85-0.92
-8. label="engineered | SVM tuned" → overall≈56-61, pp≈42-52, np≈64, auc≈0.53-0.58
+1. label="raw | SVM" -- baseline, no balancing -> overall~57, pp~20-35, np~63, auc~0.50-0.53
+2. label="relative | SVM" -- relative features -> overall~54-57, pp~30-42, np~62, auc~0.51-0.54
+3. label="both | SVM" -- raw+relative -> overall~58-62, pp~38-44, np~64, auc~0.52-0.55
+4. label="engineered | SVM" -- signal features -> overall~55-60, pp~36-45, np~63, auc~0.51-0.56
+5. label="engineered | GradBoost" -> overall~55-60, pp~38-48, np~63, auc~0.52-0.56
+6. label="Henry/Sevan benchmark" -- linear SVM no balance -> overall~63-64, pp~0-5, np~63-64, auc~0.44-0.50
+7. label="engineered | Train=Test" -- overfit check -> overall~75-82, pp~65-78, np~84-90, auc~0.85-0.92
+8. label="engineered | SVM tuned" -> overall~56-61, pp~42-52, np~64, auc~0.53-0.58
 
 Return ONLY the JSON array, no markdown, no explanation.`;
 
@@ -455,23 +457,23 @@ Return ONLY the JSON array, no markdown, no explanation.`;
       const clean = full.replace(/```json|```/g, "").trim();
       const data = JSON.parse(clean);
       setBenchRows(data);
-      addLog(`Benchmark complete — ${data.length} experiments`, "ok");
+      addLog(`Benchmark complete -- ${data.length} experiments`, "ok");
     } catch (e) { addLog("Error: " + e.message, "err"); }
     setRunning(false);
   }, [callAPI]);
 
-  // ── STABILITY ────────────────────────────────────────────────────────────────
+  // -- STABILITY ----------------------------------------------------------------
   const runStability = useCallback(async () => {
     setRunning(true); setStabPts([]); setLogs([]);
     addLog("Running rolling window stability analysis (8 windows)...", "module");
 
     const prompt = `Generate rolling window stability results for a futures ML pipeline.
 Return ONLY a JSON array of 8 elements:
-{"window":"Jan 02→Jan 10","acc":float,"pp":float,"np":float}
+{"window":"Jan 02->Jan 10","acc":float,"pp":float,"np":float}
 
 Rules: acc should vary between 46-58%, pp between 25-50%, np between 55-70%.
-Make them realistic — some windows better, some worse. Show genuine variability.
-Mean acc ≈ 51%, std ≈ 3%. Mean pp ≈ 35%, std ≈ 6%.
+Make them realistic -- some windows better, some worse. Show genuine variability.
+Mean acc ~ 51%, std ~ 3%. Mean pp ~ 35%, std ~ 6%.
 Return ONLY the JSON array.`;
 
     try {
@@ -481,7 +483,7 @@ Return ONLY the JSON array.`;
       setStabPts(data);
       const meanAcc = (data.reduce((s, d) => s + d.acc, 0) / data.length).toFixed(1);
       const meanPP  = (data.reduce((s, d) => s + d.pp, 0) / data.length).toFixed(1);
-      addLog(`Stability done — ${data.length} windows. Mean acc=${meanAcc}% Mean +prec=${meanPP}%`, "ok");
+      addLog(`Stability done -- ${data.length} windows. Mean acc=${meanAcc}% Mean +prec=${meanPP}%`, "ok");
     } catch (e) { addLog("Error: " + e.message, "err"); }
     setRunning(false);
   }, [callAPI]);
@@ -502,7 +504,7 @@ Return ONLY the JSON array.`;
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       padding: 0,
     }}>
-      {/* ── HEADER ── */}
+      {/* -- HEADER -- */}
       <div style={{
         background: "rgba(255,255,255,0.02)",
         borderBottom: "1px solid rgba(255,255,255,0.07)",
@@ -518,13 +520,13 @@ Return ONLY the JSON array.`;
             FUTURES ML PIPELINE
           </div>
           <div style={{ fontSize: 9, color: "rgba(255,255,255,0.25)", letterSpacing: "1.5px", marginTop: 1 }}>
-            TY MINUTE-LEVEL · SVM + GRADIENT BOOST · SIGN ACCURACY
+            TY MINUTE-LEVEL . SVM + GRADIENT BOOST . SIGN ACCURACY
           </div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           {["run", "benchmark", "stability"].map(t => (
             <Pill key={t} active={tab === t} onClick={() => setTab(t)}>
-              {t === "run" ? "▶ Pipeline" : t === "benchmark" ? "⊞ Benchmark" : "~ Stability"}
+              {t === "run" ? "> Pipeline" : t === "benchmark" ? "[+] Benchmark" : "[~] Stability"}
             </Pill>
           ))}
         </div>
@@ -532,7 +534,7 @@ Return ONLY the JSON array.`;
 
       <div style={{ padding: "16px 20px", maxWidth: 1100, margin: "0 auto" }}>
 
-        {/* ── RUN TAB ── */}
+        {/* -- RUN TAB -- */}
         {tab === "run" && (
           <>
             {/* Step bar */}
@@ -550,7 +552,7 @@ Return ONLY the JSON array.`;
                     <div style={{
                       width: 28, textAlign: "center", flexShrink: 0, fontSize: 11,
                       color: step > s.n ? "#00d97e" : "rgba(255,255,255,0.1)",
-                    }}>→</div>
+                    }}>-></div>
                   )}
                 </div>
               ))}
@@ -576,7 +578,7 @@ Return ONLY the JSON array.`;
                   min={50} max={90} step={5}
                   onChange={e => upd("splitPct", +e.target.value)} />
                 <div style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", marginTop: 4 }}>
-                  {cfg.splitPct}% train · {100 - cfg.splitPct}% test
+                  {cfg.splitPct}% train . {100 - cfg.splitPct}% test
                 </div>
               </div>
 
@@ -624,7 +626,7 @@ Return ONLY the JSON array.`;
                       borderRadius: 6, fontSize: 10,
                       color: "rgba(255,71,87,0.8)", lineHeight: 1.5,
                     }}>
-                      ⚠ This reproduces Henry/Sevan's setup — linear SVM, no class balancing. Predicts ~0 long positions.
+                      (!) This reproduces Henry/Sevan's setup -- linear SVM, no class balancing. Predicts ~0 long positions.
                     </div>
                   )}
                 </div>
@@ -642,7 +644,7 @@ Return ONLY the JSON array.`;
                     boxShadow: running ? "none" : "0 4px 20px rgba(0,217,126,0.3)",
                   }}
                 >
-                  {running ? "RUNNING..." : "▶  RUN PIPELINE"}
+                  {running ? "RUNNING..." : ">  RUN PIPELINE"}
                 </button>
               </div>
             </div>
@@ -656,7 +658,7 @@ Return ONLY the JSON array.`;
               marginBottom: 14,
             }}>
               {logs.length === 0
-                ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>— configure settings and click Run Pipeline —</div>
+                ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>-- configure settings and click Run Pipeline --</div>
                 : logs.map(({ t, type, id }) => {
                   const col = type === "module" ? "#63b3ed" : type === "ok" ? "#00d97e" : type === "warn" ? "#ffd666" : type === "err" ? "#ff4757" : "rgba(255,255,255,0.3)";
                   return <div key={id} style={{ fontSize: 11, lineHeight: 1.8, color: col }}>{t}</div>;
@@ -672,7 +674,7 @@ Return ONLY the JSON array.`;
                     sub="direction correct" trend={r.overall_accuracy >= 55 ? "up" : "down"} />
                   <MetricCard label="+ Precision" value={r.precision_positive?.toFixed(1) + "%"}
                     sub="long calls right" trend={r.precision_positive >= 50 ? "up" : "down"} />
-                  <MetricCard label="− Precision" value={r.precision_negative?.toFixed(1) + "%"}
+                  <MetricCard label="- Precision" value={r.precision_negative?.toFixed(1) + "%"}
                     sub="short calls right" trend={r.precision_negative >= 55 ? "up" : "down"} />
                   <MetricCard label="ROC AUC" value={r.roc_auc?.toFixed(3)}
                     sub="classifier quality" trend={r.roc_auc >= 0.55 ? "up" : "neutral"} />
@@ -680,9 +682,9 @@ Return ONLY the JSON array.`;
                     sub="from $10,000 start" trend={r.pnl >= 0 ? "up" : "down"} />
                 </div>
 
-                {/* Charts 2×2 */}
+                {/* Charts 2x2 */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <ChartCard title="AUM — Equity Curve" badge={(r.pnl >= 0 ? "+" : "") + "$" + Math.round(r.pnl)} height={170}>
+                  <ChartCard title="AUM -- Equity Curve" badge={(r.pnl >= 0 ? "+" : "") + "$" + Math.round(r.pnl)} height={170}>
                     <AUMChart data={r.aum} pnl={r.pnl} />
                   </ChartCard>
 
@@ -701,12 +703,12 @@ Return ONLY the JSON array.`;
                     <div style={{ height: "100%", overflowY: "auto", paddingRight: 4 }}>
                       {[
                         ["Model", cfg.model], ["Features", cfg.featureMode],
-                        ["Train=Test", cfg.trainAsTest ? "YES ⚠" : "NO"],
+                        ["Train=Test", cfg.trainAsTest ? "YES (!)" : "NO"],
                         ["Rows", cfg.maxRows.toLocaleString()],
                         ["Overall acc", r.overall_accuracy?.toFixed(2) + "%"],
                         ["+ Precision", r.precision_positive?.toFixed(2) + "%"],
                         ["+ Recall", r.recall_positive?.toFixed(2) + "%"],
-                        ["− Precision", r.precision_negative?.toFixed(2) + "%"],
+                        ["- Precision", r.precision_negative?.toFixed(2) + "%"],
                         ["Top-50% acc", r.accuracy_threshold?.toFixed(2) + "%"],
                         ["Pred long", r.n_pred_pos + "x"],
                         ["Pred short", r.n_pred_neg + "x"],
@@ -731,7 +733,7 @@ Return ONLY the JSON array.`;
           </>
         )}
 
-        {/* ── BENCHMARK TAB ── */}
+        {/* -- BENCHMARK TAB -- */}
         {tab === "benchmark" && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
@@ -753,7 +755,7 @@ Return ONLY the JSON array.`;
                   boxShadow: running ? "none" : "0 4px 16px rgba(99,179,237,0.3)",
                 }}
               >
-                {running ? "RUNNING..." : "⊞ RUN BENCHMARK"}
+                {running ? "RUNNING..." : "[+] RUN BENCHMARK"}
               </button>
             </div>
 
@@ -764,7 +766,7 @@ Return ONLY the JSON array.`;
               overflowY: "auto", marginBottom: 14,
             }}>
               {logs.length === 0
-                ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>— click Run Benchmark —</div>
+                ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>-- click Run Benchmark --</div>
                 : logs.slice(-2).map(({ t, type, id }) => {
                   const col = type === "module" ? "#63b3ed" : type === "ok" ? "#00d97e" : "rgba(255,255,255,0.3)";
                   return <div key={id} style={{ fontSize: 11, lineHeight: 1.8, color: col }}>{t}</div>;
@@ -825,7 +827,7 @@ Return ONLY the JSON array.`;
           </>
         )}
 
-        {/* ── STABILITY TAB ── */}
+        {/* -- STABILITY TAB -- */}
         {tab === "stability" && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
@@ -858,7 +860,7 @@ Return ONLY the JSON array.`;
               overflowY: "auto", marginBottom: 14,
             }}>
               {logs.length === 0
-                ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>— click Run Stability —</div>
+                ? <div style={{ fontSize: 11, color: "rgba(255,255,255,0.12)" }}>-- click Run Stability --</div>
                 : logs.slice(-2).map(({ t, type, id }) => (
                   <div key={id} style={{ fontSize: 11, lineHeight: 1.8, color: type === "ok" ? "#00d97e" : "rgba(255,255,255,0.3)" }}>{t}</div>
                 ))
@@ -876,15 +878,15 @@ Return ONLY the JSON array.`;
                     const std  = a => { const m = a.reduce((s, v) => s + v, 0) / a.length; return Math.sqrt(a.reduce((s, v) => s + (v-m)**2, 0) / a.length).toFixed(1); };
                     return [
                       { label: "Mean Accuracy", value: mean(accs) + "%", sub: "across windows", trend: +mean(accs) >= 53 ? "up" : "down" },
-                      { label: "Acc Std Dev", value: "±" + std(accs) + "%", sub: "variability", trend: "neutral" },
+                      { label: "Acc Std Dev", value: "+/-" + std(accs) + "%", sub: "variability", trend: "neutral" },
                       { label: "Mean +Precision", value: mean(pps) + "%", sub: "long call accuracy", trend: +mean(pps) >= 40 ? "up" : "down" },
-                      { label: "+Prec Std Dev", value: "±" + std(pps) + "%", sub: "variability", trend: "neutral" },
+                      { label: "+Prec Std Dev", value: "+/-" + std(pps) + "%", sub: "variability", trend: "neutral" },
                     ].map(p => <MetricCard key={p.label} {...p} />);
                   })()}
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <ChartCard title="Rolling Window — Acc & +Precision" height={180}>
+                  <ChartCard title="Rolling Window -- Acc & +Precision" height={180}>
                     <StabilityChart points={stabPts} />
                   </ChartCard>
 
@@ -926,4 +928,3 @@ Return ONLY the JSON array.`;
     </div>
   );
 }
-root.mainloop()
