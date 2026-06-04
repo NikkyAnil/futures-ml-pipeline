@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from module1_dataprep import prepare_data
 from module2_training import train_model
 from module3_testing import test_model
-from module4_evaluation import evaluate_model
+from module4_summary import evaluate_model
 
 # Inputs from CLI / GUI
 file_path = sys.argv[1]
