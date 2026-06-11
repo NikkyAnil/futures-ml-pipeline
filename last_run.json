@@ -1,0 +1,17 @@
+{
+  "directional_accuracy": 0.24749163879598662,
+  "mse": 0.0003494721989966555,
+  "mae": 0.015468227424749164,
+  "final_capital": 10000.328125,
+  "pnl": 0.328125,
+  "config": {
+    "csv": "TYhead1000.csv",
+    "rows": 994,
+    "lookback": 4,
+    "split_pct": 70,
+    "kernel": "rbf",
+    "C": 1.0,
+    "epsilon": 0.1,
+    "train_as_test": false
+  }
+}
