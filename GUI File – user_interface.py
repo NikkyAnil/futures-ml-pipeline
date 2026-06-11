@@ -73,7 +73,7 @@ def import_pipeline_modules():
     from module1_dataprep   import prepare_data
     from module2_training   import train_model
     from module3_testing    import test_model
-    from module4_evaluation import evaluate_model
+    from module4_summary import evaluate_model
     return prepare_data, train_model, test_model, evaluate_model
 
 MODULES_OK = True
