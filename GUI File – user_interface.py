@@ -1,14 +1,14 @@
 # dashboard.py
 # ============================================================
-# Futures ML Pipeline - Streamlit Dashboard
+# Futures ML Pipeline Dashboard
 # ============================================================
 # HOW TO RUN:
-#   1. pip install streamlit scikit-learn pandas numpy matplotlib
-#   2. streamlit run dashboard.py
-#   3. Browser opens automatically at http://localhost:8501
+#   Step 1: pip install streamlit scikit-learn pandas numpy matplotlib
+#   Step 2: streamlit run dashboard.py
+#   Browser opens automatically at http://localhost:8501
 #
 # In IntelliJ IDEA:
-#   - Open Terminal at the bottom
+#   - Open Terminal at the bottom of the screen
 #   - cd into the futures-ml-pipeline folder
 #   - Run: streamlit run dashboard.py
 # ============================================================
@@ -25,101 +25,83 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import streamlit as st
 
-# Add pipeline root to path so modules can be imported
+# Add this folder to path so the module files can be found
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-# -- Page config ---------------------------------------------------------------
+# ---- Page config ------------------------------------------------------------
 st.set_page_config(
     page_title="Futures ML Pipeline",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -- Custom CSS ----------------------------------------------------------------
+# ---- Custom CSS -------------------------------------------------------------
 st.markdown("""
 <style>
-    .main { background-color: #0e1117; }
+    [data-testid="stAppViewContainer"] { background: #0e1117; }
+    [data-testid="stSidebar"]          { background: #111827; }
     .metric-box {
         background: #1e2130;
         border: 1px solid #2d3250;
         border-radius: 8px;
-        padding: 14px 18px;
+        padding: 14px 16px;
         text-align: center;
+        margin-bottom: 4px;
     }
     .metric-label {
-        font-size: 11px;
+        font-size: 10px;
         color: #888;
         text-transform: uppercase;
         letter-spacing: 1px;
         margin-bottom: 6px;
     }
-    .metric-value {
-        font-size: 26px;
-        font-weight: 700;
-        font-family: monospace;
-    }
-    .metric-good  { color: #00d97e; }
-    .metric-bad   { color: #ff4757; }
-    .metric-plain { color: #a0aec0; }
-    .log-box {
-        background: #0a0c10;
-        border: 1px solid #2d3250;
-        border-radius: 6px;
-        padding: 12px 14px;
-        font-family: monospace;
-        font-size: 12px;
-        height: 200px;
-        overflow-y: auto;
-        color: #a0aec0;
-    }
-    .section-title {
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        color: #555;
-        margin-bottom: 10px;
-    }
-    div[data-testid="stSidebar"] {
-        background-color: #111827;
-    }
+    .metric-value { font-size: 24px; font-weight: 700; font-family: monospace; }
+    .good  { color: #00d97e; }
+    .bad   { color: #ff4757; }
+    .plain { color: #a0aec0; }
+    .step-done    { color: #00d97e; font-weight: bold; }
+    .step-active  { color: #63b3ed; font-weight: bold; }
+    .step-waiting { color: #444; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# -- Import pipeline modules ---------------------------------------------------
+# ---- Import your real modules -----------------------------------------------
 @st.cache_resource(show_spinner=False)
-def import_modules():
-    from module1_dataprep.dataprep     import load_data, build_feature_matrix, time_split, make_rolling_windows, make_subsets
-    from module2_training.training     import train_model
-    from module3_testing.testing       import run_testing
-    from module4_statistics.statistics import compute_metrics
-    return load_data, build_feature_matrix, time_split, make_rolling_windows, make_subsets, train_model, run_testing, compute_metrics
+def import_pipeline_modules():
+    from module1_dataprep   import prepare_data
+    from module2_training   import train_model
+    from module3_testing    import test_model
+    from module4_evaluation import evaluate_model
+    return prepare_data, train_model, test_model, evaluate_model
 
+MODULES_OK = True
+MODULE_ERROR = ""
 try:
-    load_data, build_feature_matrix, time_split, make_rolling_windows, make_subsets, train_model, run_testing, compute_metrics = import_modules()
-    MODULES_OK = True
+    prepare_data, train_model, test_model, evaluate_model = import_pipeline_modules()
 except Exception as e:
     MODULES_OK = False
     MODULE_ERROR = str(e)
 
 
-# -- Helper: matplotlib figure to Streamlit -----------------------------------
-def make_aum_figure(aum_history):
-    fig, ax = plt.subplots(figsize=(7, 3))
+# ---- Chart helpers ----------------------------------------------------------
+def chart_aum(capital_history):
+    fig, ax = plt.subplots(figsize=(8, 3.2))
     fig.patch.set_facecolor("#0e1117")
     ax.set_facecolor("#0e1117")
-    profit = aum_history[-1] >= aum_history[0]
+    data   = capital_history
+    profit = data[-1] >= data[0]
     color  = "#00d97e" if profit else "#ff4757"
-    ax.plot(aum_history, color=color, linewidth=2)
-    ax.axhline(aum_history[0], color="#444", linestyle="--", linewidth=0.8)
-    ax.fill_between(range(len(aum_history)), aum_history[0], aum_history,
-                    where=[v >= aum_history[0] for v in aum_history],
+    ax.plot(data, color=color, linewidth=2)
+    ax.axhline(data[0], color="#444", linestyle="--", linewidth=0.8)
+    ax.fill_between(range(len(data)), data[0], data,
+                    where=[v >= data[0] for v in data],
                     alpha=0.15, color=color)
     ax.set_xlabel("Time step", color="#666", fontsize=9)
     ax.set_ylabel("Capital ($)", color="#666", fontsize=9)
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: "$" + f"{x:,.0f}"))
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, _: "${:,.0f}".format(x)))
     ax.tick_params(colors="#555", labelsize=8)
     for sp in ax.spines.values():
         sp.set_color("#2d3250")
@@ -127,154 +109,158 @@ def make_aum_figure(aum_history):
     return fig
 
 
-def make_roc_figure(fpr, tpr, roc_auc):
-    fig, ax = plt.subplots(figsize=(4, 3.5))
+def chart_accuracy_bars(dir_acc, mse, mae):
+    fig, ax = plt.subplots(figsize=(5, 3.2))
     fig.patch.set_facecolor("#0e1117")
     ax.set_facecolor("#0e1117")
-    ax.plot(fpr, tpr, color="#63b3ed", linewidth=2.5,
-            label="AUC = {:.3f}".format(roc_auc))
-    ax.fill_between(fpr, tpr, alpha=0.08, color="#63b3ed")
-    ax.plot([0, 1], [0, 1], "--", color="#444", linewidth=1, label="Random (0.500)")
-    ax.set_xlabel("False Positive Rate", color="#666", fontsize=9)
-    ax.set_ylabel("True Positive Rate", color="#666", fontsize=9)
-    ax.tick_params(colors="#555", labelsize=8)
-    ax.legend(fontsize=8, frameon=False, labelcolor="#888")
-    for sp in ax.spines.values():
-        sp.set_color("#2d3250")
-    fig.tight_layout()
-    return fig
-
-
-def make_accuracy_figure(metrics):
-    labels = ["Overall\nAcc", "+ Precision\n(Longs)", "+ Recall", "- Precision\n(Shorts)", "Top-50%\nTrades"]
-    values = [
-        metrics["overall_accuracy"],
-        metrics["precision_positive"],
-        metrics["recall_positive"],
-        metrics["precision_negative"],
-        metrics["accuracy_threshold"],
-    ]
-    colors = ["#00d97e" if v >= 55 else "#ffd666" if v >= 45 else "#ff4757" for v in values]
-
-    fig, ax = plt.subplots(figsize=(5, 3.5))
-    fig.patch.set_facecolor("#0e1117")
-    ax.set_facecolor("#0e1117")
-    bars = ax.bar(labels, values, color=colors, edgecolor="#2d3250", linewidth=0.8, width=0.55)
-    ax.axhline(50, color="#ff4757", linestyle="--", linewidth=1.2, label="50% random baseline", alpha=0.6)
-    ax.set_ylim(0, 105)
-    ax.set_ylabel("Accuracy %", color="#666", fontsize=9)
-    ax.tick_params(colors="#555", labelsize=8)
-    ax.legend(fontsize=8, frameon=False, labelcolor="#888")
-    for bar, val in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width() / 2,
-                bar.get_height() + 1.5,
-                "{:.1f}%".format(val),
-                ha="center", va="bottom", fontsize=8, color="#ccc")
-    for sp in ax.spines.values():
-        sp.set_color("#2d3250")
-    fig.tight_layout()
-    return fig
-
-
-def make_stability_figure(stab_data):
-    fig, ax = plt.subplots(figsize=(9, 3.5))
-    fig.patch.set_facecolor("#0e1117")
-    ax.set_facecolor("#0e1117")
-    x     = np.arange(len(stab_data))
-    accs  = [d["acc"] for d in stab_data]
-    pps   = [d["pp"]  for d in stab_data]
-    lbls  = [d["label"][:16] for d in stab_data]
-    ax.plot(x, accs, "o-", color="#a78bfa", linewidth=2, markersize=5, label="Overall Acc")
-    ax.plot(x, pps,  "s-", color="#00d97e", linewidth=2, markersize=5, label="+ Precision")
-    ax.axhline(50, color="#ff4757", linestyle="--", linewidth=1, alpha=0.6, label="50% baseline")
-    ax.axhline(np.mean(accs), color="#a78bfa", linestyle=":", linewidth=1, alpha=0.5)
-    ax.axhline(np.mean(pps),  color="#00d97e",  linestyle=":", linewidth=1, alpha=0.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels(lbls, rotation=30, ha="right", fontsize=8, color="#666")
+    pct = dir_acc * 100
+    bar_color = "#00d97e" if pct >= 50 else "#ff4757"
+    ax.bar(["Directional\nAccuracy"], [pct],
+           color=bar_color, edgecolor="#2d3250", width=0.35)
+    ax.axhline(50, color="#ff4757", linestyle="--",
+               linewidth=1.2, label="50% random baseline", alpha=0.7)
     ax.set_ylim(0, 100)
     ax.set_ylabel("Accuracy %", color="#666", fontsize=9)
-    ax.tick_params(colors="#555", labelsize=8)
-    ax.legend(fontsize=8, frameon=False, labelcolor="#888", loc="upper right")
+    ax.tick_params(colors="#555", labelsize=9)
+    ax.legend(fontsize=8, frameon=False, labelcolor="#888")
+    ax.text(0, pct + 2, "{:.1f}%".format(pct),
+            ha="center", va="bottom", fontsize=13,
+            fontweight="bold", color=bar_color)
     for sp in ax.spines.values():
         sp.set_color("#2d3250")
     fig.tight_layout()
     return fig
 
 
-# -- Metric card HTML ----------------------------------------------------------
-def metric_card(label, value, good=None):
-    if good is True:
-        cls = "metric-good"
-    elif good is False:
-        cls = "metric-bad"
-    else:
-        cls = "metric-plain"
-    return """
-    <div class="metric-box">
-        <div class="metric-label">{label}</div>
-        <div class="metric-value {cls}">{value}</div>
-    </div>
-    """.format(label=label, cls=cls, value=value)
+def chart_pred_vs_actual(y_true, y_pred, n=200):
+    fig, ax = plt.subplots(figsize=(7, 3.2))
+    fig.patch.set_facecolor("#0e1117")
+    ax.set_facecolor("#0e1117")
+    n = min(n, len(y_true))
+    x = np.arange(n)
+    ax.plot(x, y_true[:n], color="#63b3ed",
+            linewidth=1.2, label="Actual", alpha=0.8)
+    ax.plot(x, y_pred[:n], color="#f6ad55",
+            linewidth=1.2, label="Predicted", alpha=0.8)
+    ax.axhline(0, color="#444", linewidth=0.8)
+    ax.set_xlabel("Test sample", color="#666", fontsize=9)
+    ax.set_ylabel("Close - Open", color="#666", fontsize=9)
+    ax.tick_params(colors="#555", labelsize=8)
+    ax.legend(fontsize=8, frameon=False, labelcolor="#aaa")
+    for sp in ax.spines.values():
+        sp.set_color("#2d3250")
+    fig.tight_layout()
+    return fig
 
 
-# -- Sidebar -------------------------------------------------------------------
+def chart_sign_scatter(y_true, y_pred):
+    fig, ax = plt.subplots(figsize=(4.5, 3.2))
+    fig.patch.set_facecolor("#0e1117")
+    ax.set_facecolor("#0e1117")
+    correct   = (np.sign(y_true) == np.sign(y_pred))
+    incorrect = ~correct
+    ax.scatter(y_true[correct],   y_pred[correct],
+               color="#00d97e", s=4, alpha=0.5, label="Correct sign")
+    ax.scatter(y_true[incorrect], y_pred[incorrect],
+               color="#ff4757", s=4, alpha=0.5, label="Wrong sign")
+    ax.axhline(0, color="#555", linewidth=0.7)
+    ax.axvline(0, color="#555", linewidth=0.7)
+    ax.set_xlabel("Actual", color="#666", fontsize=9)
+    ax.set_ylabel("Predicted", color="#666", fontsize=9)
+    ax.tick_params(colors="#555", labelsize=8)
+    ax.legend(fontsize=7, frameon=False, labelcolor="#aaa",
+              markerscale=2)
+    for sp in ax.spines.values():
+        sp.set_color("#2d3250")
+    fig.tight_layout()
+    return fig
+
+
+def chart_stability(rows):
+    fig, ax = plt.subplots(figsize=(9, 3.2))
+    fig.patch.set_facecolor("#0e1117")
+    ax.set_facecolor("#0e1117")
+    x     = np.arange(len(rows))
+    accs  = [r["directional_accuracy"] * 100 for r in rows]
+    lbls  = [r["label"][:14] for r in rows]
+    color = ["#00d97e" if v >= 50 else "#ff4757" for v in accs]
+    ax.bar(x, accs, color=color, edgecolor="#2d3250", linewidth=0.7, width=0.55)
+    ax.axhline(50, color="#ff4757", linestyle="--",
+               linewidth=1.2, label="50% baseline", alpha=0.7)
+    ax.axhline(np.mean(accs), color="#a78bfa", linestyle=":",
+               linewidth=1.2, label="Mean {:.1f}%".format(np.mean(accs)))
+    ax.set_xticks(x)
+    ax.set_xticklabels(lbls, rotation=30, ha="right",
+                       fontsize=8, color="#888")
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("Directional Accuracy %", color="#666", fontsize=9)
+    ax.tick_params(colors="#555", labelsize=8, axis="y")
+    ax.legend(fontsize=8, frameon=False, labelcolor="#aaa")
+    for bar, val in zip(ax.patches, accs):
+        ax.text(bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 1,
+                "{:.1f}%".format(val),
+                ha="center", va="bottom",
+                fontsize=7.5, color="#ccc")
+    for sp in ax.spines.values():
+        sp.set_color("#2d3250")
+    fig.tight_layout()
+    return fig
+
+
+def metric_html(label, value, good=None):
+    cls = "good" if good is True else "bad" if good is False else "plain"
+    return (
+        '<div class="metric-box">'
+        '<div class="metric-label">{}</div>'
+        '<div class="metric-value {}">{}</div>'
+        '</div>'
+    ).format(label, cls, value)
+
+
+# ---- Sidebar ----------------------------------------------------------------
 with st.sidebar:
     st.markdown("## Futures ML Pipeline")
     st.markdown("---")
 
     st.markdown("**Data**")
-    csv_path = st.text_input("CSV file path", value="TY.csv")
-    max_rows  = st.number_input("Max rows", min_value=100, max_value=50000,
-                                 value=3000, step=500)
-    lookback  = st.number_input("Lookback (minutes)", min_value=1, max_value=20,
-                                 value=4, step=1)
-    t2_date   = st.text_input("T2 split date (YYYY-MM-DD)", value="2023-10-01")
+    csv_input = st.text_input("CSV file", value="TY.csv")
+    max_rows  = st.number_input("Max rows (0 = all)", min_value=0,
+                                 max_value=100000, value=5000, step=1000)
+    lookback  = st.number_input("Lookback (minutes)", min_value=1,
+                                 max_value=20, value=4, step=1)
+    split_pct = st.slider("Train split %", 50, 90, 70, step=5)
+    target_type = st.selectbox("Target type",
+                                ["difference", "return"],
+                                format_func=lambda x:
+                                    "Close - Open (difference)" if x == "difference"
+                                    else "(Close - Open) / Open (return)")
 
     st.markdown("---")
-    st.markdown("**Model**")
-    model_type = st.selectbox("Algorithm", [
-        "svm",
-        "svm_tuned",
-        "gradient_boost",
-        "henry_sevan",
-    ], format_func=lambda x: {
-        "svm":            "SVM (RBF, balanced)",
-        "svm_tuned":      "SVM Tuned (C=5, high weight)",
-        "gradient_boost": "Gradient Boosting",
-        "henry_sevan":    "Henry/Sevan benchmark",
-    }[x])
-
-    feature_mode = st.selectbox("Feature mode", [
-        "engineered",
-        "both",
-        "raw",
-        "relative",
-    ], format_func=lambda x: {
-        "engineered": "Engineered (tick_imb + vwap)",
-        "both":       "Raw + Relative",
-        "raw":        "Raw only (baseline)",
-        "relative":   "Relative only",
-    }[x])
+    st.markdown("**Model (SVR)**")
+    kernel    = st.selectbox("Kernel", ["rbf", "linear", "poly"])
+    C_val     = st.number_input("C (regularisation)", min_value=0.1,
+                                 max_value=20.0, value=1.0, step=0.5)
+    epsilon   = st.number_input("Epsilon", min_value=0.001,
+                                 max_value=1.0, value=0.1, step=0.05)
 
     st.markdown("---")
-    st.markdown("**Options**")
     train_as_test = st.checkbox("Train = Test (overfit check)", value=False)
 
-    if model_type == "henry_sevan":
-        st.warning("Henry/Sevan: linear SVM, no balancing. Predicts ~0 long positions.")
-
     st.markdown("---")
-    csv_full = os.path.join(HERE, csv_path)
-    if os.path.exists(csv_full):
-        st.success("TY.csv found")
+    csv_path = os.path.join(HERE, csv_input)
+    if os.path.exists(csv_path):
+        st.success("{} found".format(csv_input))
     else:
-        st.error("TY.csv not found at: " + csv_full)
+        st.error("File not found:\n{}".format(csv_path))
 
     if not MODULES_OK:
-        st.error("Module import failed: " + MODULE_ERROR)
+        st.error("Import error:\n" + MODULE_ERROR)
+    else:
+        st.success("All 4 modules loaded")
 
 
-# -- Main area tabs ------------------------------------------------------------
+# ---- Tabs -------------------------------------------------------------------
 tab_run, tab_bench, tab_stability, tab_about = st.tabs([
     "  Run Pipeline  ",
     "  Benchmark  ",
@@ -283,402 +269,478 @@ tab_run, tab_bench, tab_stability, tab_about = st.tabs([
 ])
 
 
-# ===================================================================
-# TAB 1 -- RUN PIPELINE
-# ===================================================================
+# =============================================================================
+# TAB 1 - RUN PIPELINE
+# =============================================================================
 with tab_run:
     st.markdown("### Run Pipeline")
-    st.caption("Configure settings in the sidebar, then click Run.")
+    st.caption(
+        "Uses your exact module files: "
+        "module1_dataprep.py / module2_training.py / "
+        "module3_testing.py / module4_evaluation.py"
+    )
 
-    run_btn = st.button("RUN PIPELINE", type="primary", use_container_width=True,
-                        disabled=(not MODULES_OK))
+    run_btn = st.button(
+        "RUN FULL PIPELINE",
+        type="primary",
+        use_container_width=True,
+        disabled=(not MODULES_OK)
+    )
 
-    # Step progress bar
-    step_cols = st.columns(4)
-    step_names = [
-        ("1", "Data Prep",   "rolling window features"),
-        ("2", "Training",    "fit ML model"),
-        ("3", "Testing",     "predictions"),
-        ("4", "Statistics",  "metrics & charts"),
+    # Step indicators
+    s1, s2, s3, s4 = st.columns(4)
+    ph = [s1.empty(), s2.empty(), s3.empty(), s4.empty()]
+    step_info = [
+        ("Module 1", "prepare_data()"),
+        ("Module 2", "train_model()"),
+        ("Module 3", "test_model()"),
+        ("Module 4", "evaluate_model()"),
     ]
-    step_placeholders = []
-    for i, (n, name, sub) in enumerate(step_names):
-        with step_cols[i]:
-            ph = st.empty()
-            step_placeholders.append(ph)
 
-    def render_steps(active):
-        for i, (n, name, sub) in enumerate(step_names):
+    def show_steps(active):
+        for i, (name, fn) in enumerate(step_info):
             if i < active:
-                step_placeholders[i].success("Module {} - {} - DONE".format(n, name))
+                ph[i].success("{} Done".format(name))
             elif i == active:
-                step_placeholders[i].info("Module {} - {} - Running...".format(n, name))
+                ph[i].info("{} Running...".format(name))
             else:
-                step_placeholders[i].empty()
-                step_placeholders[i].caption("[ {} ] {}  \n{}".format(n, name, sub))
+                ph[i].caption("[ {} ]\n{}".format(name, fn))
 
-    render_steps(-1)
-
-    log_area   = st.empty()
+    show_steps(-1)
+    log_ph     = st.empty()
     results_ph = st.empty()
 
     if run_btn:
-        if not os.path.exists(csv_full):
-            st.error("CSV file not found: " + csv_full)
+        if not os.path.exists(csv_path):
+            st.error("CSV not found: " + csv_path)
             st.stop()
 
         logs = []
-        def add_log(msg):
-            logs.append(msg)
-            log_area.code("\n".join(logs[-20:]), language="bash")
 
-        # -- MODULE 1 ----------------------------------------------
-        render_steps(0)
-        add_log("[MODULE 1] Data preparation...")
+        def log(msg):
+            logs.append(msg)
+            log_ph.code("\n".join(logs[-25:]), language="bash")
+
+        # -- MODULE 1: prepare_data -------------------------------------------
+        show_steps(0)
+        log("[MODULE 1] prepare_data() ...")
         t0 = time.time()
 
-        df = load_data(csv_full, max_rows=int(max_rows))
-        add_log("  Loaded {:,} rows ({} to {})".format(
-            len(df),
-            df["Timestamp"].iloc[0].date(),
-            df["Timestamp"].iloc[-1].date()))
+        rows = int(max_rows) if max_rows > 0 else None
+        X, y = prepare_data(csv_path,
+                             lookback=int(lookback),
+                             target_type=target_type)
 
-        X, y, feature_names, timestamps = build_feature_matrix(
-            df, lookback=int(lookback), feature_mode=feature_mode)
-        add_log("  Features: {} | mode={}".format(X.shape, feature_mode))
-        add_log("  Target: % price change | up={} down={}".format(
+        # Limit rows if requested
+        if rows is not None and rows < len(X):
+            X = X[:rows]
+            y = y[:rows]
+
+        log("  Features: {} samples x {} features".format(X.shape[0], X.shape[1]))
+        log("  Target type: {}".format(target_type))
+        log("  Up moves: {}  Down moves: {}".format(
             int((y > 0).sum()), int((y <= 0).sum())))
 
-        X_train, y_train, X_test, y_test, _, _ = time_split(
-            X, y, timestamps, t2_date)
+        # Train/test split by index
+        split_idx = int(len(X) * split_pct / 100)
+        X_train, y_train = X[:split_idx], y[:split_idx]
+        X_test,  y_test  = X[split_idx:], y[split_idx:]
 
         if train_as_test:
             X_test, y_test = X_train.copy(), y_train.copy()
-            add_log("  [!] train_as_test ON - test = training data")
+            log("  [!] train_as_test ON - using training set as test set")
 
-        add_log("  Train: {:,} | Test: {:,}".format(len(X_train), len(X_test)))
-        add_log("  Time: {:.1f}s".format(time.time() - t0))
+        log("  Train: {:,}  |  Test: {:,}".format(len(X_train), len(X_test)))
+        log("  Time: {:.1f}s".format(time.time() - t0))
 
-        # -- MODULE 2 ----------------------------------------------
-        render_steps(1)
-        add_log("[MODULE 2] Training {}...".format(model_type.upper()))
+        # -- MODULE 2: train_model --------------------------------------------
+        show_steps(1)
+        log("[MODULE 2] train_model() ...")
         t1 = time.time()
-        model, scaler = train_model(X_train, y_train, model_type=model_type)
-        add_log("  Model: {}".format(type(model).__name__))
-        add_log("  Time: {:.1f}s".format(time.time() - t1))
 
-        # -- MODULE 3 ----------------------------------------------
-        render_steps(2)
-        add_log("[MODULE 3] Generating predictions...")
+        model, scaler = train_model(
+            X_train, y_train,
+            C=float(C_val),
+            epsilon=float(epsilon),
+            kernel=kernel
+        )
+        log("  Model: SVR(kernel={}, C={}, epsilon={})".format(
+            kernel, C_val, epsilon))
+        log("  Scaler: StandardScaler fitted")
+        log("  Time: {:.1f}s".format(time.time() - t1))
+
+        # -- MODULE 3: test_model ---------------------------------------------
+        show_steps(2)
+        log("[MODULE 3] test_model() ...")
         t2 = time.time()
-        y_true, y_pred, y_proba = run_testing(model, scaler, X_test, y_test)
-        add_log("  Predictions: {:,} samples".format(len(y_pred)))
-        add_log("  Time: {:.1f}s".format(time.time() - t2))
 
-        # -- MODULE 4 ----------------------------------------------
-        render_steps(3)
-        add_log("[MODULE 4] Computing statistics...")
+        predictions, y_test_out = test_model(model, scaler, X_test, y_test)
+        log("  Predictions: {:,} samples".format(len(predictions)))
+        log("  Time: {:.1f}s".format(time.time() - t2))
+
+        # -- MODULE 4: evaluate_model -----------------------------------------
+        show_steps(3)
+        log("[MODULE 4] evaluate_model() ...")
         t3 = time.time()
-        metrics, aum, fpr, tpr, roc_auc = compute_metrics(
-            y_true, y_pred, y_proba, y_continuous=y_test)
-        add_log("  Time: {:.1f}s".format(time.time() - t3))
-        add_log("[COMPLETE] Total time: {:.1f}s".format(time.time() - t0))
 
-        # Render steps all done
+        results = evaluate_model(y_test_out, predictions)
+        log("  MSE:  {:.6f}".format(results["mse"]))
+        log("  MAE:  {:.6f}".format(results["mae"]))
+        log("  Directional accuracy: {:.1f}%".format(
+            results["directional_accuracy"] * 100))
+        log("  Final capital: ${:,.2f}".format(results["final_capital"]))
+        log("[COMPLETE] Total time: {:.1f}s".format(time.time() - t0))
+
+        # Mark all steps done
         for i in range(4):
-            step_placeholders[i].success("Module {} - {} - DONE".format(
-                step_names[i][0], step_names[i][1]))
+            ph[i].success("{} Done".format(step_info[i][0]))
 
-        # -- METRICS -----------------------------------------------
+        # ---- Metrics row ----------------------------------------------------
         st.markdown("---")
         st.markdown("#### Results")
 
-        m1, m2, m3, m4, m5 = st.columns(5)
-        acc = metrics["overall_accuracy"]
-        pp  = metrics["precision_positive"]
-        np_ = metrics["precision_negative"]
-        auc = metrics["roc_auc"]
-        pnl = metrics["pnl"]
+        dir_acc = results["directional_accuracy"]
+        pnl     = results["final_capital"] - 10000
 
-        m1.markdown(metric_card("Overall Accuracy",
-                                "{:.1f}%".format(acc), acc >= 55),
-                    unsafe_allow_html=True)
-        m2.markdown(metric_card("+ Precision (Longs)",
-                                "{:.1f}%".format(pp), pp >= 50),
-                    unsafe_allow_html=True)
-        m3.markdown(metric_card("- Precision (Shorts)",
-                                "{:.1f}%".format(np_), np_ >= 55),
-                    unsafe_allow_html=True)
-        m4.markdown(metric_card("ROC AUC",
-                                "{:.3f}".format(auc), auc >= 0.55),
-                    unsafe_allow_html=True)
-        m5.markdown(metric_card("P and L",
-                                ("+" if pnl >= 0 else "") + "${:,.0f}".format(pnl),
-                                pnl >= 0),
-                    unsafe_allow_html=True)
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.markdown(metric_html(
+            "Directional Accuracy",
+            "{:.1f}%".format(dir_acc * 100),
+            dir_acc >= 0.50
+        ), unsafe_allow_html=True)
+        c2.markdown(metric_html(
+            "MSE",
+            "{:.6f}".format(results["mse"]),
+            None
+        ), unsafe_allow_html=True)
+        c3.markdown(metric_html(
+            "MAE",
+            "{:.6f}".format(results["mae"]),
+            None
+        ), unsafe_allow_html=True)
+        c4.markdown(metric_html(
+            "Final Capital",
+            "${:,.2f}".format(results["final_capital"]),
+            results["final_capital"] >= 10000
+        ), unsafe_allow_html=True)
+        c5.markdown(metric_html(
+            "P and L",
+            ("+" if pnl >= 0 else "") + "${:,.2f}".format(pnl),
+            pnl >= 0
+        ), unsafe_allow_html=True)
 
-        # -- CHARTS ------------------------------------------------
+        # ---- Charts ---------------------------------------------------------
         st.markdown("---")
-        c1, c2 = st.columns(2)
-        with c1:
+        col1, col2 = st.columns(2)
+
+        with col1:
             st.markdown("**AUM - Money Under Management**")
-            st.pyplot(make_aum_figure(aum), use_container_width=True)
+            st.pyplot(chart_aum(results["capital_history"]),
+                      use_container_width=True)
 
-        with c2:
-            st.markdown("**ROC Curve**")
-            st.pyplot(make_roc_figure(fpr, tpr, roc_auc), use_container_width=True)
+        with col2:
+            st.markdown("**Directional Accuracy**")
+            st.pyplot(
+                chart_accuracy_bars(
+                    results["directional_accuracy"],
+                    results["mse"],
+                    results["mae"]
+                ),
+                use_container_width=True
+            )
 
-        c3, c4 = st.columns(2)
-        with c3:
-            st.markdown("**Sign Accuracy Breakdown**")
-            st.pyplot(make_accuracy_figure(metrics), use_container_width=True)
+        col3, col4 = st.columns(2)
 
-        with c4:
-            st.markdown("**Summary**")
-            summary_data = {
-                "Metric": [
-                    "Model", "Feature mode", "Train=Test",
-                    "Rows loaded", "Train samples", "Test samples",
-                    "Overall accuracy", "+ Precision (longs)", "+ Recall",
-                    "- Precision (shorts)", "Top-50% confidence acc",
-                    "Predicted long", "Predicted short",
-                    "ROC AUC", "Final capital", "P and L",
-                ],
-                "Value": [
-                    model_type, feature_mode, str(train_as_test),
-                    str(int(max_rows)), str(len(X_train)), str(len(X_test)),
-                    "{:.2f}%".format(metrics["overall_accuracy"]),
-                    "{:.2f}%".format(metrics["precision_positive"]),
-                    "{:.2f}%".format(metrics["recall_positive"]),
-                    "{:.2f}%".format(metrics["precision_negative"]),
-                    "{:.2f}%".format(metrics["accuracy_threshold"]),
-                    str(metrics["n_pred_positive"]),
-                    str(metrics["n_pred_negative"]),
-                    str(metrics["roc_auc"]),
-                    "${:,.2f}".format(metrics["final_capital"]),
-                    ("+" if pnl >= 0 else "") + "${:,.2f}".format(pnl),
-                ],
+        with col3:
+            st.markdown("**Predicted vs Actual (first 200 test samples)**")
+            st.pyplot(
+                chart_pred_vs_actual(y_test_out, predictions, n=200),
+                use_container_width=True
+            )
+
+        with col4:
+            st.markdown("**Sign Accuracy Scatter**")
+            st.caption("Green = correct direction, Red = wrong direction")
+            st.pyplot(
+                chart_sign_scatter(y_test_out, predictions),
+                use_container_width=True
+            )
+
+        # ---- Summary table --------------------------------------------------
+        st.markdown("---")
+        st.markdown("**Summary**")
+        summary = pd.DataFrame({
+            "Metric": [
+                "CSV file", "Rows used", "Lookback",
+                "Train samples", "Test samples", "Train=Test",
+                "Kernel", "C", "Epsilon",
+                "Directional accuracy", "MSE", "MAE",
+                "Starting capital", "Final capital", "P and L",
+            ],
+            "Value": [
+                csv_input,
+                str(len(X)),
+                str(lookback),
+                str(len(X_train)),
+                str(len(X_test)),
+                "YES" if train_as_test else "NO",
+                kernel,
+                str(C_val),
+                str(epsilon),
+                "{:.2f}%".format(dir_acc * 100),
+                "{:.6f}".format(results["mse"]),
+                "{:.6f}".format(results["mae"]),
+                "$10,000.00",
+                "${:,.2f}".format(results["final_capital"]),
+                ("+" if pnl >= 0 else "") + "${:,.2f}".format(pnl),
+            ],
+        })
+        st.dataframe(summary, use_container_width=True, hide_index=True)
+
+        # Save results to JSON
+        save_results = {
+            "directional_accuracy": results["directional_accuracy"],
+            "mse":                  results["mse"],
+            "mae":                  results["mae"],
+            "final_capital":        results["final_capital"],
+            "pnl":                  pnl,
+            "config": {
+                "csv":          csv_input,
+                "rows":         len(X),
+                "lookback":     lookback,
+                "split_pct":    split_pct,
+                "kernel":       kernel,
+                "C":            C_val,
+                "epsilon":      epsilon,
+                "train_as_test": train_as_test,
             }
-            st.dataframe(pd.DataFrame(summary_data),
-                         use_container_width=True, hide_index=True)
-
-        # Save metrics JSON
-        json_path = os.path.join(HERE, "last_metrics.json")
+        }
+        json_path = os.path.join(HERE, "last_run.json")
         with open(json_path, "w") as f:
-            json.dump(metrics, f, indent=2)
-        st.caption("Metrics saved to: " + json_path)
+            json.dump(save_results, f, indent=2)
+        st.caption("Results saved to last_run.json")
 
 
-# ===================================================================
-# TAB 2 -- BENCHMARK
-# ===================================================================
+# =============================================================================
+# TAB 2 - BENCHMARK
+# =============================================================================
 with tab_bench:
-    st.markdown("### Feature and Model Benchmark")
-    st.caption("Runs all feature modes and models. Compares against Henry/Sevan baseline.")
+    st.markdown("### Benchmark: Kernel and Row Size Comparison")
+    st.caption(
+        "Runs all three SVR kernels (rbf / linear / poly) on two dataset sizes. "
+        "Uses your real module files."
+    )
 
-    bench_btn = st.button("RUN BENCHMARK", type="primary",
-                           use_container_width=True, disabled=(not MODULES_OK),
-                           key="bench_btn")
+    bench_btn = st.button(
+        "RUN BENCHMARK",
+        type="primary",
+        use_container_width=True,
+        disabled=(not MODULES_OK),
+        key="bench_btn"
+    )
 
     if bench_btn:
-        if not os.path.exists(csv_full):
-            st.error("CSV not found: " + csv_full)
+        if not os.path.exists(csv_path):
+            st.error("CSV not found: " + csv_path)
             st.stop()
 
-        EXPERIMENTS = [
-            ("raw + SVM",               "raw",        "svm"),
-            ("relative + SVM",          "relative",   "svm"),
-            ("both + SVM",              "both",       "svm"),
-            ("engineered + SVM",        "engineered", "svm"),
-            ("engineered + SVM Tuned",  "engineered", "svm_tuned"),
-            ("engineered + GradBoost",  "engineered", "gradient_boost"),
-            ("Henry/Sevan benchmark",   "raw",        "henry_sevan"),
-            ("engineered + Train=Test", "engineered", "svm"),
+        CONFIGS = [
+            ("rbf    | 3k rows",  "rbf",    1.0, 0.1, 3000),
+            ("linear | 3k rows",  "linear", 1.0, 0.1, 3000),
+            ("poly   | 3k rows",  "poly",   1.0, 0.1, 3000),
+            ("rbf    | 5k rows",  "rbf",    1.0, 0.1, 5000),
+            ("linear | 5k rows",  "linear", 1.0, 0.1, 5000),
+            ("rbf    | Train=Test","rbf",   1.0, 0.1, 3000),
         ]
 
-        progress_bar = st.progress(0)
-        status_text  = st.empty()
-        rows = []
+        progress = st.progress(0)
+        status   = st.empty()
+        bench_rows = []
 
-        for i, (label, fm, mt) in enumerate(EXPERIMENTS):
-            status_text.text("Running: {} ({}/{})".format(label, i + 1, len(EXPERIMENTS)))
+        for i, (label, kern, c, eps, nrows) in enumerate(CONFIGS):
+            status.text("Running: {} ({}/{})".format(label, i + 1, len(CONFIGS)))
             try:
-                df_b   = load_data(csv_full, max_rows=3000)
-                Xb, yb, _, tsb = build_feature_matrix(df_b, 4, fm)
-                Xt, yt, Xe, ye, _, _ = time_split(Xb, yb, tsb, t2_date)
+                Xb, yb = prepare_data(csv_path,
+                                      lookback=4,
+                                      target_type="difference")
+                if nrows < len(Xb):
+                    Xb, yb = Xb[:nrows], yb[:nrows]
 
-                # overfit check for last experiment
+                sp = int(len(Xb) * 0.7)
+                Xt, yt = Xb[:sp], yb[:sp]
+                Xe, ye = Xb[sp:], yb[sp:]
+
                 if "Train=Test" in label:
                     Xe, ye = Xt.copy(), yt.copy()
 
-                if len(Xt) < 20 or len(Xe) < 10:
-                    continue
+                mb, sb = train_model(Xt, yt, C=c, epsilon=eps, kernel=kern)
+                preds_b, ye_out = test_model(mb, sb, Xe, ye)
+                res_b = evaluate_model(ye_out, preds_b)
 
-                mod_b, sc_b = train_model(Xt, yt, mt)
-                y1, y2, yp  = run_testing(mod_b, sc_b, Xe, ye)
-                mb, _, _, _, _ = compute_metrics(y1, y2, yp, ye)
-
-                rows.append({
-                    "Experiment":        label,
-                    "Overall %":         round(mb["overall_accuracy"], 1),
-                    "+ Precision %":     round(mb["precision_positive"], 1),
-                    "+ Recall %":        round(mb["recall_positive"], 1),
-                    "- Precision %":     round(mb["precision_negative"], 1),
-                    "AUC":               round(mb["roc_auc"], 4),
-                    "P and L ($)":       round(mb["pnl"], 0),
-                    "Pred Long":         mb["n_pred_positive"],
-                    "Pred Short":        mb["n_pred_negative"],
+                bench_rows.append({
+                    "Experiment":           label,
+                    "Directional Acc %":    round(res_b["directional_accuracy"] * 100, 1),
+                    "MSE":                  round(res_b["mse"], 6),
+                    "MAE":                  round(res_b["mae"], 6),
+                    "Final Capital ($)":    round(res_b["final_capital"], 2),
+                    "P and L ($)":          round(res_b["final_capital"] - 10000, 2),
+                    "Train samples":        len(Xt),
+                    "Test samples":         len(Xe),
                 })
             except Exception as e:
-                rows.append({"Experiment": label, "Overall %": 0,
-                             "+ Precision %": 0, "Error": str(e)})
+                bench_rows.append({
+                    "Experiment": label,
+                    "Directional Acc %": 0,
+                    "Error": str(e),
+                })
 
-            progress_bar.progress((i + 1) / len(EXPERIMENTS))
+            progress.progress((i + 1) / len(CONFIGS))
 
-        status_text.text("Benchmark complete.")
+        status.text("Benchmark complete.")
 
-        if rows:
-            df_results = pd.DataFrame(rows)
+        if bench_rows:
+            df_bench = pd.DataFrame(bench_rows)
 
-            # Colour-code the dataframe using Styler
-            def colour_pct(val):
+            def colour_acc(val):
                 if not isinstance(val, (int, float)):
                     return ""
-                if val >= 55:
+                if val >= 50:
                     return "background-color: #1a3a2a; color: #00d97e"
-                elif val >= 45:
-                    return "background-color: #3a3010; color: #ffd666"
                 else:
                     return "background-color: #3a1010; color: #ff4757"
 
-            styled = (df_results.style
-                      .applymap(colour_pct, subset=["Overall %", "+ Precision %", "- Precision %"])
+            styled = (df_bench.style
+                      .applymap(colour_acc, subset=["Directional Acc %"])
                       .format({
-                          "Overall %":     "{:.1f}%",
-                          "+ Precision %": "{:.1f}%",
-                          "+ Recall %":    "{:.1f}%",
-                          "- Precision %": "{:.1f}%",
-                          "AUC":           "{:.4f}",
-                          "P and L ($)":   "${:+.0f}",
+                          "Directional Acc %": "{:.1f}%",
+                          "MSE":               "{:.6f}",
+                          "MAE":               "{:.6f}",
+                          "Final Capital ($)": "${:,.2f}",
+                          "P and L ($)":       "${:+.2f}",
                       }))
-
             st.dataframe(styled, use_container_width=True, hide_index=True)
-
-            # + Precision comparison chart
-            st.markdown("---")
-            st.markdown("**+ Precision Comparison (target: above 50%)**")
-            fig_b, ax_b = plt.subplots(figsize=(10, 3.5))
-            fig_b.patch.set_facecolor("#0e1117")
-            ax_b.set_facecolor("#0e1117")
-            labels_b = [r["Experiment"][:28] for r in rows]
-            pps_b    = [r.get("+ Precision %", 0) for r in rows]
-            colors_b = ["#00d97e" if v >= 50 else "#ffd666" if v >= 40 else "#ff4757" for v in pps_b]
-            bars_b   = ax_b.bar(labels_b, pps_b, color=colors_b, edgecolor="#2d3250", linewidth=0.8)
-            ax_b.axhline(50, color="#ff4757", linestyle="--", linewidth=1.5,
-                         label="50% random baseline", alpha=0.7)
-            ax_b.set_ylim(0, 105)
-            ax_b.set_ylabel("+ Precision %", color="#666", fontsize=9)
-            ax_b.tick_params(colors="#555", labelsize=8, axis="y")
-            ax_b.tick_params(colors="#888", labelsize=8, axis="x", rotation=20)
-            ax_b.legend(fontsize=8, frameon=False, labelcolor="#888")
-            for bar, val in zip(bars_b, pps_b):
-                ax_b.text(bar.get_x() + bar.get_width() / 2,
-                          bar.get_height() + 1,
-                          "{:.1f}%".format(val),
-                          ha="center", va="bottom", fontsize=8, color="#ccc")
-            for sp in ax_b.spines.values():
-                sp.set_color("#2d3250")
-            fig_b.tight_layout()
-            st.pyplot(fig_b, use_container_width=True)
 
             # Save benchmark JSON
             bench_path = os.path.join(HERE, "benchmark_summary.json")
             with open(bench_path, "w") as f:
-                json.dump(rows, f, indent=2)
-            st.caption("Benchmark results saved to: " + bench_path)
+                json.dump(bench_rows, f, indent=2)
+            st.caption("Saved to benchmark_summary.json")
 
 
-# ===================================================================
-# TAB 3 -- STABILITY
-# ===================================================================
+# =============================================================================
+# TAB 3 - STABILITY
+# =============================================================================
 with tab_stability:
     st.markdown("### Rolling Window Stability")
-    st.caption("Tests if accuracy holds across different time periods. Each window = 800 rows, 70/30 split.")
+    st.caption(
+        "Tests whether directional accuracy holds across different time windows. "
+        "Uses prepare_data -> train_model -> test_model -> evaluate_model."
+    )
 
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        n_windows   = st.slider("Number of windows", 4, 10, 6)
-        window_size = st.slider("Window size (rows)", 400, 2000, 800, step=100)
-    with col_s2:
-        step_size   = st.slider("Step size (rows)", 200, 1000, 400, step=100)
-        stab_model  = st.selectbox("Model", ["svm", "gradient_boost", "henry_sevan"],
-                                   key="stab_model")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        n_slices    = st.slider("Number of time slices", 4, 12, 6)
+        slice_rows  = st.slider("Rows per slice", 500, 5000, 2000, step=500)
+    with col_b:
+        stab_kernel = st.selectbox("Kernel for stability test",
+                                   ["rbf", "linear"], key="stab_k")
+        stab_lookback = st.number_input("Lookback", min_value=1,
+                                         max_value=20, value=4,
+                                         key="stab_lb")
 
-    stab_btn = st.button("RUN STABILITY ANALYSIS", type="primary",
-                          use_container_width=True, disabled=(not MODULES_OK),
-                          key="stab_btn")
+    stab_btn = st.button(
+        "RUN STABILITY ANALYSIS",
+        type="primary",
+        use_container_width=True,
+        disabled=(not MODULES_OK),
+        key="stab_btn"
+    )
 
     if stab_btn:
-        if not os.path.exists(csv_full):
-            st.error("CSV not found: " + csv_full)
+        if not os.path.exists(csv_path):
+            st.error("CSV not found: " + csv_path)
             st.stop()
 
-        rows_needed = window_size + (n_windows - 1) * step_size + 50
-        df_s = load_data(csv_full, max_rows=min(rows_needed, 46158))
-        Xs, ys, _, tss = build_feature_matrix(df_s, 4, "engineered")
-        windows = make_rolling_windows(Xs, ys, tss,
-                                        window_size=window_size,
-                                        step=step_size)
+        rows_needed = slice_rows * n_slices
+        Xs_all, ys_all = prepare_data(
+            csv_path,
+            lookback=int(stab_lookback),
+            target_type="difference"
+        )
+        if rows_needed > len(Xs_all):
+            rows_needed = len(Xs_all)
+
+        Xs_all = Xs_all[:rows_needed]
+        ys_all = ys_all[:rows_needed]
 
         progress_s = st.progress(0)
-        stab_data  = []
+        stab_rows  = []
 
-        for i, (Xtr, ytr, Xte, yte, lbl) in enumerate(windows[:n_windows]):
-            if len(Xtr) < 20 or len(Xte) < 10:
+        actual_size  = len(Xs_all) // n_slices
+        for i in range(n_slices):
+            start = i * actual_size
+            end   = start + actual_size
+            Xw    = Xs_all[start:end]
+            yw    = ys_all[start:end]
+            sp    = int(len(Xw) * 0.7)
+
+            if sp < 10 or (len(Xw) - sp) < 5:
                 continue
-            mod_s, sc_s = train_model(Xtr, ytr, stab_model)
-            y1, y2, yp  = run_testing(mod_s, sc_s, Xte, yte)
-            ms, _, _, _, _ = compute_metrics(y1, y2, yp, yte)
-            stab_data.append({
-                "label":  lbl,
-                "acc":    ms["overall_accuracy"],
-                "pp":     ms["precision_positive"],
-                "np":     ms["precision_negative"],
-                "auc":    ms["roc_auc"],
-                "pnl":    ms["pnl"],
-            })
-            progress_s.progress((i + 1) / min(n_windows, len(windows)))
 
-        if stab_data:
-            accs = [d["acc"] for d in stab_data]
-            pps  = [d["pp"]  for d in stab_data]
+            try:
+                mw, sw = train_model(Xw[:sp], yw[:sp],
+                                     kernel=stab_kernel)
+                pw, yw_out = test_model(mw, sw, Xw[sp:], yw[sp:])
+                rw = evaluate_model(yw_out, pw)
+                stab_rows.append({
+                    "label":                "Slice {}".format(i + 1),
+                    "rows":                 "{}..{}".format(start, end),
+                    "directional_accuracy": rw["directional_accuracy"],
+                    "mse":                  rw["mse"],
+                    "pnl":                  rw["final_capital"] - 10000,
+                })
+            except Exception as e:
+                stab_rows.append({
+                    "label": "Slice {} ERROR".format(i + 1),
+                    "directional_accuracy": 0,
+                    "mse": 0,
+                    "pnl": 0,
+                })
+
+            progress_s.progress((i + 1) / n_slices)
+
+        if stab_rows:
+            accs = [r["directional_accuracy"] * 100 for r in stab_rows]
 
             # Summary stats
             sc1, sc2, sc3, sc4 = st.columns(4)
-            sc1.metric("Mean Accuracy",    "{:.1f}%".format(np.mean(accs)))
-            sc2.metric("Acc Std Dev",      "+/-{:.1f}%".format(np.std(accs)))
-            sc3.metric("Mean + Precision", "{:.1f}%".format(np.mean(pps)))
-            sc4.metric("+Prec Std Dev",    "+/-{:.1f}%".format(np.std(pps)))
+            sc1.metric("Mean Accuracy",
+                       "{:.1f}%".format(np.mean(accs)))
+            sc2.metric("Std Dev",
+                       "+/-{:.1f}%".format(np.std(accs)))
+            sc3.metric("Min",
+                       "{:.1f}%".format(np.min(accs)))
+            sc4.metric("Max",
+                       "{:.1f}%".format(np.max(accs)))
 
             st.markdown("---")
-            st.markdown("**Rolling Window Chart**")
-            st.pyplot(make_stability_figure(stab_data), use_container_width=True)
+            st.markdown("**Accuracy Across Time Slices**")
+            st.pyplot(chart_stability(stab_rows), use_container_width=True)
 
-            st.markdown("**Window Detail Table**")
+            st.markdown("**Detail Table**")
             df_stab = pd.DataFrame([{
-                "Window":       d["label"],
-                "Accuracy %":   round(d["acc"], 1),
-                "+ Precision %": round(d["pp"],  1),
-                "- Precision %": round(d["np"],  1),
-                "AUC":           round(d["auc"],  4),
-                "P and L ($)":   round(d["pnl"],  0),
-            } for d in stab_data])
+                "Slice":        r["label"],
+                "Row range":    r["rows"],
+                "Dir Acc %":    round(r["directional_accuracy"] * 100, 1),
+                "MSE":          round(r["mse"], 6),
+                "P and L ($)":  round(r["pnl"], 2),
+            } for r in stab_rows])
             st.dataframe(df_stab, use_container_width=True, hide_index=True)
 
 
-# ===================================================================
-# TAB 4 -- ABOUT
-# ===================================================================
+# =============================================================================
+# TAB 4 - ABOUT
+# =============================================================================
 with tab_about:
     st.markdown("### About This Pipeline")
     st.markdown("""
@@ -686,50 +748,54 @@ with tab_about:
 
 ---
 
-#### Pipeline Modules
+#### Your Module Files
 
-| Module | File | Purpose |
-|--------|------|---------|
-| Module 1 | module1_dataprep/dataprep.py | Load CSV, build rolling window features |
-| Module 2 | module2_training/training.py | Train SVM or Gradient Boost classifier |
-| Module 3 | module3_testing/testing.py   | Predict on test set |
-| Module 4 | module4_statistics/statistics.py | Compute metrics, AUM, ROC |
-
----
-
-#### Feature Modes
-
-- **engineered** - tick_imb + vwap_dev + close_pos (strongest upward prediction signals)
-- **both** - raw OHLCV + relative % change features
-- **raw** - absolute OHLCV values only (matches Henry/Sevan original setup)
-- **relative** - each value as % change from that minute's open price
+| Module | File | Function called |
+|--------|------|-----------------|
+| Module 1 | module1_dataprep.py | prepare_data(file_path, lookback, target_type) |
+| Module 2 | module2_training.py | train_model(X_train, y_train, C, epsilon, kernel) |
+| Module 3 | module3_testing.py  | test_model(model, scaler, X_test, y_test) |
+| Module 4 | module4_evaluation.py | evaluate_model(y_true, y_pred) |
 
 ---
 
-#### Key Finding
+#### What Each Module Returns
 
-Henry/Sevan's 63.6% accuracy uses linear SVM with no class balancing.
-The data is 64% down moves, so predicting "down" every time gives 63.6% accuracy.
-This is NOT a real signal - it predicts zero long positions.
-
-Our engineered features with balanced SVM get genuine + precision of 38-45%
-and the model actually predicts both directions.
+- **prepare_data** returns X (feature matrix), y (target vector)
+- **train_model** returns model (SVR), scaler (StandardScaler)
+- **test_model** returns predictions, y_test
+- **evaluate_model** returns dict with mse, mae, directional_accuracy, final_capital, capital_history
 
 ---
 
 #### How to Run
 
-```bash
-# Install dependencies
-pip install streamlit scikit-learn pandas numpy matplotlib flask
+Open IntelliJ IDEA Terminal and run:
 
-# Run dashboard (this file)
+```
+pip install streamlit scikit-learn pandas numpy matplotlib
 streamlit run dashboard.py
+```
 
-# Run pipeline from command line
-python run_pipeline.py
+Browser opens at http://localhost:8501
 
-# Run all benchmark experiments
-python run_benchmark.py
+---
+
+#### Pipeline Flow
+
+```
+TY.csv
+   |
+   v
+prepare_data()    -- builds rolling window features
+   |
+   v
+train_model()     -- trains SVR
+   |
+   v
+test_model()      -- generates predictions
+   |
+   v
+evaluate_model()  -- computes MSE, accuracy, AUM
 ```
     """)
