@@ -224,7 +224,7 @@ with st.sidebar:
     st.markdown("---")
 
     st.markdown("**Data**")
-    csv_input = st.text_input("CSV file", value="TY.csv")
+    csv_input = st.text_input("CSV file", value="enter csv full path")
     max_rows  = st.number_input("Max rows (0 = all)", min_value=0,
                                  max_value=100000, value=5000, step=1000)
     lookback  = st.number_input("Lookback (minutes)", min_value=1,
