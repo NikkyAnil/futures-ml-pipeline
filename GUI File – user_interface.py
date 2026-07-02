@@ -248,7 +248,8 @@ with st.sidebar:
     train_as_test = st.checkbox("Train = Test (overfit check)", value=False)
 
     st.markdown("---")
-    csv_path = os.path.join(HERE, csv_input)
+    # csv_path = os.path.join(HERE, csv_input)
+    csv_path = csv_input
     if os.path.exists(csv_path):
         st.success("{} found".format(csv_input))
     else:
